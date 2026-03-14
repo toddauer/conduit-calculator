@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#1A1D23" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Conduit Fill" />
+  <meta name="description" content="NEC 2023 Conduit Fill Calculator — Chapter 9 Tables 4 & 5" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <title>Conduit Fill Calculator</title>
+
+  <style>
+    /* ── Reset & Base ─────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #1A1D23;
+      --surface:   #22262F;
+      --surface2:  #2A2F3A;
+      --border:    #3A3F4D;
+      --accent:    #F5A623;
+      --accent2:   #3B82F6;
+      --success:   #22C55E;
+      --danger:    #EF4444;
+      --text:      #E8EBF0;
+      --text-dim:  #7A8090;
+      --text-dark: #1A1D23;
+      --radius:    10px;
+      --font-mono: 'Courier New', Courier, monospace;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 14px;
+      overflow-x: hidden;
+    }
+
+    /* ── Layout ───────────────────────────────── */
+    #app {
+      display: flex;
+      flex-direction: column;
+      min-height: 100dvh;
+      max-width: 480px;
+      margin: 0 auto;
+    }
+
+    /* ── Title Bar ────────────────────────────── */
+    #titlebar {
+      display: flex;
+      align-items: center;
+      background: var(--surface2);
+      padding: 0 16px;
+      height: 56px;
+      gap: 12px;
+      flex-shrink: 0;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    #titlebar .stripe { width: 4px; height: 56px; background: var(--accent); flex-shrink: 0; margin-left: -16px; }
+    #titlebar .badge {
+      width: 34px; height: 34px;
+      background: var(--accent);
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 6px;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+    #titlebar .titles { flex: 1; }
+    #titlebar .titles h1 { font-size: 13px; font-weight: bold; color: var(--text); letter-spacing: 0.5px; }
+    #titlebar .titles p  { font-size: 9px; color: var(--text-dim); margin-top: 1px; }
+    #help-btn {
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--text-dim); border-radius: 6px;
+      width: 30px; height: 30px;
+      font-family: var(--font-mono); font-size: 13px; cursor: pointer;
+    }
+    #help-btn:active { background: var(--border); }
+
+    /* ── Scrollable content ───────────────────── */
+    #content { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+
+    /* ── Cards ────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .card-header {
+      padding: 8px 12px 4px;
+      font-size: 9px;
+      font-weight: bold;
+      color: var(--accent);
+      letter-spacing: 1px;
+    }
+    .card-body { padding: 10px 12px 12px; }
+
+    /* ── Form fields ──────────────────────────── */
+    .field-group { display: flex; flex-wrap: wrap; gap: 8px; }
+    .field { display: flex; flex-direction: column; gap: 4px; }
+    .field label { font-size: 9px; color: var(--text-dim); letter-spacing: 0.5px; }
+    .field input, .field select {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      padding: 8px 10px;
+      outline: none;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    .field select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23F5A623'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 28px; }
+    .field input:focus, .field select:focus { border-color: var(--accent); }
+    .field.qty input { width: 70px; }
+    .field.awg select { width: 90px; }
+    .field.insul select { width: 110px; }
+    .field.dia input { width: 110px; }
+    .field.cable select { width: 100%; }
+
+    /* ── Toggle ───────────────────────────────── */
+    .toggle-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .toggle-row label { font-size: 10px; color: var(--text-dim); cursor: pointer; }
+    .toggle { position: relative; width: 38px; height: 22px; flex-shrink: 0; }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute; inset: 0;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 22px; cursor: pointer; transition: background 0.2s;
+    }
+    .toggle-slider::before {
+      content: ''; position: absolute;
+      width: 16px; height: 16px; left: 2px; top: 2px;
+      background: var(--text-dim); border-radius: 50%; transition: 0.2s;
+    }
+    .toggle input:checked + .toggle-slider { background: var(--accent); border-color: var(--accent); }
+    .toggle input:checked + .toggle-slider::before { transform: translateX(16px); background: var(--text-dark); }
+
+    /* ── Buttons ──────────────────────────────── */
+    .btn-row { display: flex; gap: 8px; margin-top: 10px; }
+    .btn {
+      padding: 9px 16px; border-radius: 6px;
+      font-family: var(--font-mono); font-size: 12px;
+      cursor: pointer; border: none; font-weight: bold;
+      letter-spacing: 0.5px; transition: opacity 0.15s;
+    }
+    .btn:active { opacity: 0.75; }
+    .btn-accent { background: var(--accent); color: var(--text-dark); flex: 1; }
+    .btn-ghost  { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+
+    /* ── CSV row ──────────────────────────────── */
+    .csv-row { display: flex; gap: 8px; margin-top: 6px; }
+    .csv-row .btn { font-size: 10px; padding: 6px 12px; }
+
+    /* ── Conductor list ───────────────────────── */
+    #conductor-list { display: flex; flex-direction: column; gap: 0; }
+    .conductor-item {
+      display: flex; align-items: center; gap: 0;
+      padding: 9px 12px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer; transition: background 0.1s;
+    }
+    .conductor-item:last-child { border-bottom: none; }
+    .conductor-item:active { background: var(--surface2); }
+    .conductor-item.even { background: var(--surface); }
+    .conductor-item.odd  { background: var(--surface2); }
+    .ci-qty  { width: 32px; font-size: 12px; color: var(--accent); font-weight: bold; flex-shrink: 0; }
+    .ci-name { flex: 1; font-size: 12px; color: var(--text); }
+    .ci-insul{ width: 50px; font-size: 10px; color: var(--text-dim); text-align: right; flex-shrink: 0; }
+    .ci-area { width: 80px; font-size: 10px; color: var(--text-dim); text-align: right; flex-shrink: 0; }
+    .ci-del  { width: 28px; text-align: right; color: var(--danger); font-size: 16px; flex-shrink: 0; padding-left: 6px; }
+    .list-empty { padding: 20px; text-align: center; color: var(--text-dim); font-size: 11px; }
+
+    /* ── Results ──────────────────────────────── */
+    #result-card .total { font-size: 13px; font-weight: bold; color: var(--text); margin-bottom: 8px; }
+    #result-card .result-text { font-size: 12px; font-weight: bold; line-height: 1.7; white-space: pre-line; }
+    #result-card .result-text.success { color: var(--success); }
+    #result-card .result-text.warn    { color: var(--accent); }
+    #result-card .result-text.danger  { color: var(--danger); }
+
+    /* ── Visualizer ───────────────────────────── */
+    #viz-card { display: flex; flex-direction: column; align-items: center; padding: 12px; }
+    #viz-label { font-size: 9px; color: var(--text-dim); letter-spacing: 1px; margin-bottom: 6px; }
+    #viz-canvas { display: block; }
+    #viz-pct { font-size: 18px; font-weight: bold; margin-top: 4px; }
+
+    /* ── mm² toggle ───────────────────────────── */
+    #unit-toggle-row { display: flex; align-items: center; gap: 8px; }
+    #unit-toggle-row label { font-size: 10px; color: var(--text-dim); cursor: pointer; }
+
+    /* ── Status bar ───────────────────────────── */
+    #statusbar {
+      background: var(--surface2);
+      border-top: 1px solid var(--border);
+      padding: 6px 14px;
+      font-size: 9px;
+      color: var(--text-dim);
+      flex-shrink: 0;
+    }
+
+    /* ── Help overlay ─────────────────────────── */
+    #help-overlay {
+      display: none;
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,0.7);
+      align-items: flex-end;
+    }
+    #help-overlay.open { display: flex; }
+    #help-panel {
+      background: var(--bg);
+      border-top: 2px solid var(--accent);
+      width: 100%; max-height: 85dvh;
+      border-radius: 16px 16px 0 0;
+      display: flex; flex-direction: column;
+      overflow: hidden;
+    }
+    #help-panel-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 16px; background: var(--surface2);
+      flex-shrink: 0;
+    }
+    #help-panel-header h2 { font-size: 12px; color: var(--text); letter-spacing: 0.5px; }
+    #help-close {
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--text-dim); border-radius: 6px;
+      width: 28px; height: 28px; font-size: 16px; cursor: pointer;
+    }
+    #help-body { overflow-y: auto; padding: 14px 16px; flex: 1; }
+    #help-body p { font-size: 11px; color: var(--text-dim); line-height: 1.7; margin-bottom: 14px; }
+    #help-body h3 { font-size: 10px; color: var(--accent); letter-spacing: 1px; margin-bottom: 8px; margin-top: 14px; }
+    .ref-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    .ref-table th { background: var(--surface2); color: var(--accent); padding: 6px 8px; text-align: left; font-size: 9px; letter-spacing: 0.5px; }
+    .ref-table td { padding: 5px 8px; border-bottom: 1px solid var(--border); color: var(--text-dim); }
+    .ref-table tr:nth-child(even) td { background: var(--surface2); }
+
+    /* ── Tabs in help ─────────────────────────── */
+    .tab-bar { display: flex; gap: 4px; margin-bottom: 10px; flex-wrap: wrap; }
+    .tab-btn {
+      padding: 5px 10px; border-radius: 6px; font-size: 10px;
+      font-family: var(--font-mono); cursor: pointer;
+      background: var(--surface2); color: var(--text-dim);
+      border: 1px solid var(--border); transition: 0.15s;
+    }
+    .tab-btn.active { background: var(--accent); color: var(--text-dark); border-color: var(--accent); }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* ── Install banner ───────────────────────── */
+    #install-banner {
+      display: none;
+      background: var(--surface2);
+      border: 1px solid var(--accent);
+      border-radius: var(--radius);
+      padding: 10px 12px;
+      margin: 0 12px;
+      gap: 10px;
+      align-items: center;
+    }
+    #install-banner.show { display: flex; }
+    #install-banner p { flex: 1; font-size: 11px; color: var(--text); }
+    #install-btn { background: var(--accent); color: var(--text-dark); border: none; border-radius: 6px; padding: 7px 14px; font-family: var(--font-mono); font-size: 11px; font-weight: bold; cursor: pointer; }
+    #install-dismiss { background: none; border: none; color: var(--text-dim); font-size: 18px; cursor: pointer; padding: 0 4px; }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Title Bar -->
+  <div id="titlebar">
+    <div class="stripe"></div>
+    <div class="badge">⚡</div>
+    <div class="titles">
+      <h1>CONDUIT FILL CALCULATOR</h1>
+      <p>NEC 2023 · Chapter 9 Tables 4 &amp; 5</p>
+    </div>
+    <button id="help-btn">?</button>
+  </div>
+
+  <!-- Install Banner (shown on supported browsers) -->
+  <div id="install-banner">
+    <p>⚡ Add to Home Screen for offline use</p>
+    <button id="install-btn">INSTALL</button>
+    <button id="install-dismiss">✕</button>
+  </div>
+
+  <div id="content">
+
+    <!-- Input Card -->
+    <div class="card">
+      <div class="card-header">ADD CONDUCTOR / CABLE</div>
+      <div class="card-body">
+
+        <div class="toggle-row">
+          <label class="toggle">
+            <input type="checkbox" id="cable-toggle">
+            <span class="toggle-slider"></span>
+          </label>
+          <label for="cable-toggle">Cable Mode</label>
+        </div>
+
+        <div class="field-group" id="conductor-inputs">
+          <div class="field qty">
+            <label>QTY</label>
+            <input type="number" id="qty" min="1" value="" inputmode="numeric" placeholder="1" />
+          </div>
+          <div class="field awg">
+            <label>AWG</label>
+            <select id="awg">
+              <option value="">— AWG —</option>
+              <option>18</option><option>16</option><option>14</option>
+              <option>12</option><option>10</option><option>8</option>
+              <option>6</option><option>4</option><option>2</option>
+              <option>1</option><option>1/0</option><option>2/0</option>
+              <option>3/0</option><option>4/0</option>
+            </select>
+          </div>
+          <div class="field insul">
+            <label>INSULATION</label>
+            <select id="insul">
+              <option value="">— Type —</option>
+              <option>THHN</option><option>MTW</option>
+            </select>
+          </div>
+          <div class="field dia">
+            <label>DIAMETER (in)</label>
+            <input type="number" id="dia" step="0.0001" min="0" placeholder="0.0000" inputmode="decimal" />
+          </div>
+        </div>
+
+        <div class="field-group" id="cable-inputs" style="display:none;">
+          <div class="field qty">
+            <label>QTY</label>
+            <input type="number" id="cable-qty" min="1" value="" inputmode="numeric" placeholder="1" />
+          </div>
+          <div class="field" style="flex:1;">
+            <label>CABLE NAME</label>
+            <select id="cable-select">
+              <option value="">— Select Cable —</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-accent" id="add-btn">＋  ADD</button>
+          <button class="btn btn-ghost" id="clear-btn">CLEAR ALL</button>
+        </div>
+
+        <div class="csv-row">
+          <button class="btn btn-ghost" id="export-btn">⬇ EXPORT CSV</button>
+          <button class="btn btn-ghost" id="import-btn">⬆ IMPORT CSV</button>
+          <input type="file" id="csv-file" accept=".csv" style="display:none;" />
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Conductor List -->
+    <div class="card">
+      <div class="card-header">CONDUCTORS / CABLES</div>
+      <div id="conductor-list">
+        <div class="list-empty">No conductors added yet.</div>
+      </div>
+    </div>
+
+    <!-- Results -->
+    <div class="card" id="result-card" style="display:none;">
+      <div class="card-header">RESULTS</div>
+      <div class="card-body">
+        <div id="unit-toggle-row" class="toggle-row" style="margin-bottom:10px;">
+          <label class="toggle">
+            <input type="checkbox" id="mm2-toggle">
+            <span class="toggle-slider"></span>
+          </label>
+          <label for="mm2-toggle">Display in mm²</label>
+        </div>
+        <div class="total" id="total-area">TOTAL AREA —</div>
+        <div class="result-text" id="result-text"></div>
+      </div>
+    </div>
+
+    <!-- Visualizer -->
+    <div class="card" id="viz-card-wrap" style="display:none;">
+      <div id="viz-card">
+        <div id="viz-label">CONDUIT FILL VISUALIZER</div>
+        <canvas id="viz-canvas" width="160" height="160"></canvas>
+        <div id="viz-pct"></div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+
+  <!-- Status Bar -->
+  <div id="statusbar">Ready  ·  NEC 2023 Ch.9 Tables 4 &amp; 5</div>
+
+</div><!-- /app -->
+
+<!-- Help Overlay -->
+<div id="help-overlay">
+  <div id="help-panel">
+    <div id="help-panel-header">
+      <h2>REFERENCE TABLES &amp; HELP</h2>
+      <button id="help-close">✕</button>
+    </div>
+    <div id="help-body">
+      <p>
+        Conduit areas are based on NEC 2023 Chapter 9 Table 4 (EMT).
+        THHN conductor diameters are from NEC Chapter 9 Table 5.
+        MTW conductor diameters and cable diameters are based on manufacturer
+        specifications.<br><br>
+        <strong style="color:var(--text)">NEC Fill Limits:</strong>
+        53% (1 conductor) · 31% (2 conductors) · 40% (3+ conductors)
+      </p>
+
+      <div class="tab-bar">
+        <button class="tab-btn active" data-tab="conduit">Conduit</button>
+        <button class="tab-btn" data-tab="conductor">Conductors</button>
+        <button class="tab-btn" data-tab="cable">Cables</button>
+      </div>
+
+      <div class="tab-content active" id="tab-conduit">
+        <table class="ref-table" id="ref-conduit"></table>
+      </div>
+      <div class="tab-content" id="tab-conductor">
+        <table class="ref-table" id="ref-conductor"></table>
+      </div>
+      <div class="tab-content" id="tab-cable">
+        <table class="ref-table" id="ref-cable"></table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────
+// DATA (embedded from data_tables.json)
+// ─────────────────────────────────────────────
+const DATA = {
+  conduit: {
+    "Recommended Conduit": {
+      "1/2":1.526/4.858,"3/4":0.549,"1":0.873,"1-1/4":1.526,
+      "1-1/2":1.981,"2":3.246,"2-1/2":4.881,"3":7.475,"3-1/2":9.731,"4":12.566
+    }
+  },
+  conductors: {
+    THHN: {
+      "16":0.105,"14":0.11,"12":0.13,"10":0.164,"8":0.216,
+      "6":0.254,"4":0.324,"2":0.384,"1":0.446,
+      "1/0":0.486,"2/0":0.532,"3/0":0.584,"4/0":0.642
+    },
+    MTW: {
+      "18":0.105,"16":0.120,"14":0.135,"12":0.147,
+      "10":0.171,"8":0.233,"6":0.350,"4":0.410
+    }
+  },
+  cables: {
+    "Yellow Clutch Valve MM 100182812 (15M)":0.500,
+    "Clutch Dump Valve MM 100183583":0.240,
+    "Dump Valve Detection Switch MM 100205447":0.200,
+    "Clutch Valve MM 100182812":0.381,
+    "Coil Line Interconnect MM 100205425":0.345,
+    "Die Protection MM 100205510":0.268,
+    "Ethernet Network MM 100205795":0.240,
+    "Vamco Encoder Output MM 100205398":0.273,
+    "Stroke Position Resolver MM 100165357":0.000,
+    "Strain Link MM 100205447":0.200,
+    "Other (Edit Diameter In Register)":0.000
+  }
+};
+
+// Fix conduit data — use the actual NEC values
+DATA.conduit["Recommended Conduit"] = {
+  "1/2":0.314,"3/4":0.549,"1":0.873,"1-1/4":1.526,
+  "1-1/2":1.981,"2":3.246,"2-1/2":4.881,"3":7.475,"3-1/2":9.731,"4":12.566
+};
+
+const MM2_PER_IN2 = 645.16;
+
+// ─────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────
+let rows = [];
+let autoDia = true;
+
+// ─────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────
+function areaFromDia(dia, qty) { return Math.PI / 4 * dia * dia * qty; }
+function getFillFactor(count) { return count === 1 ? 0.53 : count === 2 ? 0.31 : 0.40; }
+function fillColor(pct) { return pct <= 30 ? '#22C55E' : pct <= 40 ? '#F5A623' : '#EF4444'; }
+function fmtArea(area, mm2) {
+  const f = mm2 ? area * MM2_PER_IN2 : area;
+  const u = mm2 ? 'mm²' : 'in²';
+  return `${f.toFixed(5)} ${u}`;
+}
+
+// ─────────────────────────────────────────────
+// POPULATE CABLE SELECT
+// ─────────────────────────────────────────────
+const cableSelect = document.getElementById('cable-select');
+for (const [name, dia] of Object.entries(DATA.cables)) {
+  const opt = document.createElement('option');
+  opt.value = name;
+  opt.textContent = `${name}  (${dia.toFixed(3)}")`;
+  cableSelect.appendChild(opt);
+}
+
+// ─────────────────────────────────────────────
+// AUTO-FILL DIAMETER
+// ─────────────────────────────────────────────
+function autofillDia() {
+  if (!autoDia) return;
+  const awg   = document.getElementById('awg').value;
+  const insul = document.getElementById('insul').value;
+  if (!awg || !insul) return;
+  const dia = DATA.conductors[insul]?.[awg];
+  if (dia !== undefined) {
+    document.getElementById('dia').value = dia.toFixed(4);
+  }
+}
+document.getElementById('awg').addEventListener('change', autofillDia);
+document.getElementById('insul').addEventListener('change', autofillDia);
+document.getElementById('dia').addEventListener('input', () => { autoDia = false; });
+
+// ─────────────────────────────────────────────
+// CABLE MODE TOGGLE
+// ─────────────────────────────────────────────
+document.getElementById('cable-toggle').addEventListener('change', function() {
+  document.getElementById('conductor-inputs').style.display = this.checked ? 'none' : 'flex';
+  document.getElementById('cable-inputs').style.display     = this.checked ? 'flex' : 'none';
+});
+
+// ─────────────────────────────────────────────
+// ADD ROW
+// ─────────────────────────────────────────────
+document.getElementById('add-btn').addEventListener('click', addRow);
+document.addEventListener('keydown', e => { if (e.key === 'Enter') addRow(); });
+
+function addRow() {
+  const isCable = document.getElementById('cable-toggle').checked;
+
+  if (isCable) {
+    const qty = parseInt(document.getElementById('cable-qty').value) || 0;
+    const name = document.getElementById('cable-select').value;
+    if (qty <= 0) { alert('Quantity must be a positive integer.'); return; }
+    if (!name) { alert('Please select a cable.'); return; }
+    const dia = DATA.cables[name];
+    rows.push({ qty, awg: name, insulation: 'CABLE', diameter: dia, area: areaFromDia(dia, qty) });
+    document.getElementById('cable-qty').value = '';
+    document.getElementById('cable-select').value = '';
+  } else {
+    const qty = parseInt(document.getElementById('qty').value) || 0;
+    const awg = document.getElementById('awg').value;
+    const insul = document.getElementById('insul').value;
+    const diaRaw = document.getElementById('dia').value;
+    if (qty <= 0) { alert('Quantity must be a positive integer.'); return; }
+    if (!diaRaw) { alert('Diameter is required.'); return; }
+    const dia = parseFloat(diaRaw);
+    if (isNaN(dia) || dia < 0) { alert('Invalid diameter.'); return; }
+    rows.push({ qty, awg: awg || '—', insulation: insul || '—', diameter: dia, area: areaFromDia(dia, qty) });
+    document.getElementById('qty').value = '';
+    document.getElementById('awg').value = '';
+    document.getElementById('insul').value = '';
+    document.getElementById('dia').value = '';
+    autoDia = true;
+  }
+
+  renderList();
+  recalculate();
+  setStatus(`${rows.length} item(s) in list`);
+}
+
+// ─────────────────────────────────────────────
+// RENDER LIST
+// ─────────────────────────────────────────────
+function renderList() {
+  const list = document.getElementById('conductor-list');
+  const mm2 = document.getElementById('mm2-toggle').checked;
+  if (!rows.length) {
+    list.innerHTML = '<div class="list-empty">No conductors added yet.</div>';
+    return;
+  }
+  list.innerHTML = rows.map((r, i) => `
+    <div class="conductor-item ${i % 2 === 0 ? 'even' : 'odd'}" data-idx="${i}">
+      <div class="ci-qty">${r.qty}×</div>
+      <div class="ci-name">${r.awg}</div>
+      <div class="ci-insul">${r.insulation}</div>
+      <div class="ci-area">${fmtArea(r.area, mm2)}</div>
+      <div class="ci-del" data-del="${i}">✕</div>
+    </div>
+  `).join('');
+
+  list.querySelectorAll('[data-del]').forEach(el => {
+    el.addEventListener('click', e => {
+      e.stopPropagation();
+      rows.splice(parseInt(el.dataset.del), 1);
+      renderList();
+      recalculate();
+      setStatus(`${rows.length} item(s) remaining`);
+    });
+  });
+}
+
+// ─────────────────────────────────────────────
+// RECALCULATE
+// ─────────────────────────────────────────────
+let selectedFillPct = null;
+
+function recalculate() {
+  const mm2 = document.getElementById('mm2-toggle').checked;
+  const resultCard = document.getElementById('result-card');
+  const vizCard = document.getElementById('viz-card-wrap');
+
+  if (!rows.length) {
+    resultCard.style.display = 'none';
+    vizCard.style.display = 'none';
+    selectedFillPct = null;
+    clearViz();
+    return;
+  }
+
+  resultCard.style.display = '';
+  vizCard.style.display = '';
+
+  const totalArea = rows.reduce((s, r) => s + r.area, 0);
+  const totalQty  = rows.reduce((s, r) => s + r.qty,  0);
+
+  document.getElementById('total-area').textContent =
+    `TOTAL AREA  ${fmtArea(totalArea, mm2)}`;
+
+  const fill = getFillFactor(totalQty);
+  let resultLines = [];
+  selectedFillPct = null;
+
+  for (const sizes of Object.values(DATA.conduit)) {
+    const sorted = Object.entries(sizes).sort((a, b) => a[1] - b[1]);
+    let prevSize = null, prevArea = null;
+
+    for (const [size, area] of sorted) {
+      if (totalArea <= area * fill) {
+        const pct = (totalArea / area) * 100;
+        selectedFillPct = pct;
+        resultLines.push(`▶  ${size}"  —  ${pct.toFixed(1)}% fill  (recommended)`);
+        if (prevSize && totalArea <= prevArea * 0.5) {
+          const pp = (totalArea / prevArea) * 100;
+          resultLines.push(`▶  ${prevSize}"  —  ${pp.toFixed(1)}% fill  (≤50% option)`);
+        }
+        break;
+      }
+      prevSize = size; prevArea = area;
+    }
+    if (resultLines.length) break;
+  }
+
+  const resultEl = document.getElementById('result-text');
+  if (resultLines.length) {
+    const pct = selectedFillPct;
+    const cls = pct <= 30 ? 'success' : pct <= 40 ? 'warn' : 'danger';
+    resultEl.className = `result-text ${cls}`;
+    resultEl.textContent = 'RECOMMENDED CONDUIT\n' + resultLines.join('\n');
+  } else {
+    resultEl.className = 'result-text danger';
+    resultEl.textContent = '⚠  No suitable conduit found in table.';
+  }
+
+  drawViz();
+}
+
+// ─────────────────────────────────────────────
+// VISUALIZER (Canvas)
+// ─────────────────────────────────────────────
+function clearViz() {
+  const canvas = document.getElementById('viz-canvas');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  document.getElementById('viz-pct').textContent = '';
+}
+
+function drawViz() {
+  const canvas = document.getElementById('viz-canvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const cx = W / 2, cy = H / 2, R = 62;
+  ctx.clearRect(0, 0, W, H);
+
+  if (selectedFillPct === null) return;
+  const pct = selectedFillPct;
+  const color = fillColor(pct);
+
+  // Outer conduit ring background
+  ctx.beginPath();
+  ctx.arc(cx, cy, R + 5, 0, Math.PI * 2);
+  ctx.fillStyle = '#22262F';
+  ctx.fill();
+
+  // Conductor fill bubble
+  const rSmall = R * Math.sqrt(pct / 100);
+  const smallCy = cy + (R - rSmall);
+
+  // Glow
+  const grad = ctx.createRadialGradient(cx, smallCy, 0, cx, smallCy, rSmall + 6);
+  grad.addColorStop(0, color + '33');
+  grad.addColorStop(1, 'transparent');
+  ctx.beginPath();
+  ctx.arc(cx, smallCy, rSmall + 6, 0, Math.PI * 2);
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Fill circle
+  ctx.beginPath();
+  ctx.arc(cx, smallCy, rSmall, 0, Math.PI * 2);
+  ctx.fillStyle = '#2A2F3A';
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2.5;
+  ctx.fill();
+  ctx.stroke();
+
+  // Conduit ring
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, 0, Math.PI * 2);
+  ctx.strokeStyle = '#7A8090';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Top tick
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - R);
+  ctx.lineTo(cx, cy - R - 5);
+  ctx.strokeStyle = '#7A8090';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  const pctEl = document.getElementById('viz-pct');
+  pctEl.textContent = `${pct.toFixed(1)}%`;
+  pctEl.style.color = color;
+}
+
+// ─────────────────────────────────────────────
+// mm² TOGGLE
+// ─────────────────────────────────────────────
+document.getElementById('mm2-toggle').addEventListener('change', () => {
+  renderList();
+  recalculate();
+});
+
+// ─────────────────────────────────────────────
+// CLEAR ALL
+// ─────────────────────────────────────────────
+document.getElementById('clear-btn').addEventListener('click', () => {
+  if (rows.length && !confirm('Clear all conductors?')) return;
+  rows = [];
+  renderList();
+  recalculate();
+  setStatus('Cleared');
+});
+
+// ─────────────────────────────────────────────
+// CSV EXPORT
+// ─────────────────────────────────────────────
+document.getElementById('export-btn').addEventListener('click', () => {
+  if (!rows.length) { alert('Nothing to export.'); return; }
+  const lines = ['qty,awg,insulation,diameter', ...rows.map(r =>
+    `${r.qty},${r.awg},${r.insulation},${r.diameter}`)];
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'conduit_fill.csv';
+  a.click();
+  setStatus('Exported CSV');
+});
+
+// ─────────────────────────────────────────────
+// CSV IMPORT
+// ─────────────────────────────────────────────
+document.getElementById('import-btn').addEventListener('click', () => {
+  document.getElementById('csv-file').click();
+});
+document.getElementById('csv-file').addEventListener('change', function() {
+  const file = this.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const lines = e.target.result.split('\n').filter(Boolean);
+    let imported = 0;
+    lines.slice(1).forEach(line => {
+      const [qty, awg, insulation, diameter] = line.split(',');
+      const q = parseInt(qty), d = parseFloat(diameter);
+      if (!isNaN(q) && !isNaN(d) && q > 0) {
+        rows.push({ qty: q, awg: awg || '', insulation: insulation || '', diameter: d, area: areaFromDia(d, q) });
+        imported++;
+      }
+    });
+    renderList(); recalculate();
+    setStatus(`Imported ${imported} rows`);
+  };
+  reader.readAsText(file);
+  this.value = '';
+});
+
+// ─────────────────────────────────────────────
+// STATUS BAR
+// ─────────────────────────────────────────────
+function setStatus(msg) {
+  document.getElementById('statusbar').textContent = `${msg}  ·  NEC 2023 Ch.9`;
+}
+
+// ─────────────────────────────────────────────
+// HELP OVERLAY
+// ─────────────────────────────────────────────
+document.getElementById('help-btn').addEventListener('click', openHelp);
+document.getElementById('help-close').addEventListener('click', () => {
+  document.getElementById('help-overlay').classList.remove('open');
+});
+document.getElementById('help-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('help-overlay'))
+    document.getElementById('help-overlay').classList.remove('open');
+});
+
+function openHelp() {
+  buildRefTables();
+  document.getElementById('help-overlay').classList.add('open');
+}
+
+function buildRefTables() {
+  // Conduit
+  const ct = document.getElementById('ref-conduit');
+  if (!ct.querySelector('thead')) {
+    ct.innerHTML = `<thead><tr><th>Size</th><th>Area (in²)</th><th>40% (in²)</th><th>50% (in²)</th></tr></thead><tbody></tbody>`;
+    const tbody = ct.querySelector('tbody');
+    for (const sizes of Object.values(DATA.conduit)) {
+      for (const [size, area] of Object.entries(sizes)) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${size}"</td><td>${area.toFixed(4)}</td><td>${(area*.4).toFixed(4)}</td><td>${(area*.5).toFixed(4)}</td>`;
+        tbody.appendChild(tr);
+      }
+    }
+  }
+  // Conductors
+  const cond = document.getElementById('ref-conductor');
+  if (!cond.querySelector('thead')) {
+    cond.innerHTML = `<thead><tr><th>Insulation</th><th>AWG</th><th>Dia (in)</th></tr></thead><tbody></tbody>`;
+    const tbody = cond.querySelector('tbody');
+    for (const [insul, awgs] of Object.entries(DATA.conductors)) {
+      for (const [awg, dia] of Object.entries(awgs)) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${insul}</td><td>${awg}</td><td>${dia.toFixed(4)}</td>`;
+        tbody.appendChild(tr);
+      }
+    }
+  }
+  // Cables
+  const cabl = document.getElementById('ref-cable');
+  if (!cabl.querySelector('thead')) {
+    cabl.innerHTML = `<thead><tr><th>Cable Name</th><th>Dia (in)</th></tr></thead><tbody></tbody>`;
+    const tbody = cabl.querySelector('tbody');
+    for (const [name, dia] of Object.entries(DATA.cables)) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${name}</td><td>${dia.toFixed(4)}</td>`;
+      tbody.appendChild(tr);
+    }
+  }
+}
+
+// Tabs in help
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    this.classList.add('active');
+    document.getElementById(`tab-${this.dataset.tab}`).classList.add('active');
+  });
+});
+
+// ─────────────────────────────────────────────
+// PWA INSTALL PROMPT
+// ─────────────────────────────────────────────
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  document.getElementById('install-banner').classList.add('show');
+});
+document.getElementById('install-btn').addEventListener('click', async () => {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  const { outcome } = await deferredPrompt.userChoice;
+  deferredPrompt = null;
+  document.getElementById('install-banner').classList.remove('show');
+});
+document.getElementById('install-dismiss').addEventListener('click', () => {
+  document.getElementById('install-banner').classList.remove('show');
+});
+
+// ─────────────────────────────────────────────
+// SERVICE WORKER
+// ─────────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
